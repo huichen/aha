@@ -1,0 +1,347 @@
+<script src="d3.min.js"></script>
+<script src="jquery.min.js"></script>
+<script src="computing.js"></script>
+
+<link href="select2.min.css" rel="stylesheet" />
+<script src="select2.min.js"></script>
+<script src="draw_bar_chart.js"></script>
+
+<style>
+	html { font-family:sans-serif;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;}
+	html div {
+		font-size: 1.01em !important;
+		color: #000 !important;
+		font-family: Arial !important;
+	}
+	body {
+	}
+
+</style>
+<script>
+	var metrics = new Array();
+	var tags = new Array();
+	var percentData = [];
+	var oldQuery1 = "";
+	var optionSearch;
+	var tagSearch;
+	function getParameterByName(name) {
+	    name = name.replace(/[\[]/, "\\[").replace(/[\]]/, "\\]");
+            var regex = new RegExp("[\\?&]" + name + "=([^&#]*)"),
+	    results = regex.exec(location.search);
+	    return results === null ? "" : decodeURIComponent(results[1].replace(/\+/g, " "));
+        }
+
+
+	search = function() {
+		tagQuery = "";
+		for (key in window.tags) {
+			tagQuery += (key+ ",");
+		}
+		if (tagQuery.length > 0) {
+			tagQuery = tagQuery.substring(0, tagQuery.length - 1);
+		}
+
+		metricQuery = "";
+		for (key in window.metrics) {
+			metricQuery += (key+ ",");
+		}
+		if (metricQuery.length > 0) {
+			metricQuery = metricQuery.substring(0, metricQuery.length - 1);
+		}
+
+		if (metricQuery == "" || tagQuery == "") {
+			return
+		}
+
+		query1 = "/metric?query="+tagQuery + "&metrics=" + metricQuery + "&show_info=true&min_count=1&min_percent=0.001";
+
+		$("#permlink").html("<a href=\"/?tags=" + tagQuery + "&metrics=" + metricQuery + "#oneGroup\" target=\"_blank\">快捷链接</a>")
+		if (query1 != window.oldQuery1) {
+			d3.select('#chart').text("");
+			d3.select("#chart").select('svg').remove();
+			computing("#chart");
+			$.ajax({
+				url: query1,
+				type: "GET",
+				data: { },
+				dataType: "json",
+				success: function (result) {
+					if ('error' in result) {
+						return {}
+					}
+					if (result.metrics != null && result.metrics.length > 0 && result.metrics[0].options != null) {
+						window.tgiData = [];
+						window.percentData = [];
+						var options = result.metrics[0].options;
+						for (i = 0; i < options.length; i++){
+							window.percentData[i]= [options[i].info.option_name, options[i].percent*100, options[i].tgi];
+						}
+						window.percentData.sort(function(a,b){ return b[1] - a[1]; });
+
+
+						d3.select('#chart').text("");
+						d3.select("#chart").select('svg').remove();
+						data = []
+						for (i = 0; i < window.percentData.length; i++) {
+							data.push({label: window.percentData[i][0],
+							firstValue: window.percentData[i][1],
+							secondValue: window.percentData[i][2],
+							})
+						}
+						drawBarChart("#chart", data)
+						window.oldQuery1 = query1;
+						return
+					}
+					d3.select('#chart').text("该人群在单个细分维度上人数过少，请更换条件后再尝试");
+			}})
+		}
+
+	}
+
+	update = function(tags, info, label)  {
+		tagQuery = "";
+		for (key in tags) {
+			tagQuery += (key+ ",");
+		}
+		if (tagQuery.length > 0) {
+			tagQuery = tagQuery.substring(0, tagQuery.length - 1);
+		}
+		query = "/metric?count_users_only=true&query="+tagQuery;
+		$.ajax({
+			url: query,
+			type: "GET",
+			data: { },
+			dataType: "json",
+			success: function (result) {
+				if ('error' in result) {
+					return {}
+				}
+				$(info).text("全网满足条件的人群共有"+ result.total_num_users + "人")
+		}})
+	}
+
+</script>
+
+<script>
+	$(document).ready(function() {
+		window.optionSearch = $(".option_search").select2({
+			placeholder: "搜索选择人群属性，属性间为“并且”的关系",
+			ajax: {
+				url: "/option",
+				dataType: 'json',
+				delay: 250,
+				data: function (params) {
+					return {
+						query: params.term
+					};
+				},
+				processResults: function (data, params) {
+					if ('error' in data) {
+						return { results: [{id: 0}]}
+					}
+					if (data.options != null && data.options.length > 0) {
+						for (i = 0; i < data.options.length; i++) {
+							data.options[i].id = data.options[i].option_id
+						}
+						return {
+							results: data.options
+						};
+						} else {
+						return { results: [{id: 0}]}
+					}
+				},
+				cache: true
+			},
+			escapeMarkup: function (markup) { return markup; }, // let our custom formatter work
+			minimumInputLength: 1,
+			templateResult: formatOption, // omitted for brevity, see the source of this page
+			templateSelection: formatOptionSelection // omitted for brevity, see the source of this page
+		});
+		$(".option_search").on("select2:select", function (e) {
+			window.tags[e.params.data.tag_id + ":" + e.params.data.option_id] = true;
+			update(window.tags, "#info1", "")
+		});
+		$(".option_search").on("select2:unselect", function (e) {
+				name = e.params.data.tag_id + ":" + e.params.data.option_id
+				if (e.params.data.id.substring(0, 4) == "tags") {
+					name = e.params.data.id.substring(4, name.length)
+				}
+				delete window.tags[name];
+			update(window.tags, "#info1", "")
+		});
+	});
+
+	function formatOption (tag) {
+		if (tag.loading) return tag.text;
+		if (tag.tag_name != null && tag.option_name != null) {
+			return tag.tag_name + ":" + tag.option_name;
+		}
+		return null;
+	}
+
+	function formatOptionSelection (tag) {
+	if (tag.id.substring(0, 4) == "tags") {
+		var name
+		console.log(tag.id.substring(4, tag.id.length))
+		$.ajax({
+			async: false,
+			dataType: "json",
+			url: "/option?option_key="+tag.id.substring(4, tag.id.length),
+		        success:function(data) {
+			name = data.options[0].tag_name + ":" + data.options[0].option_name
+			console.log(name)
+		}});
+		return name
+	}
+		return tag.tag_name + ":" + tag.option_name;
+	}
+
+	$(document).ready(function() {
+		window.tagSearch = $(".tag_search").select2({
+			maximumSelectionLength: 1,
+			placeholder: "搜索选择一个人群分析维度",
+			ajax: {
+				url: "/tag",
+				dataType: 'json',
+				delay: 250,
+				data: function (params) {
+					return {
+						query: params.term
+					};
+				},
+				processResults: function (data, params) {
+					if ('error' in data) {
+						return { results: [{id: 0}]}
+					}
+					if (data.tags != null && data.tags.length > 0) {
+						for (i = 0; i < data.tags.length; i++) {
+							data.tags[i].id = data.tags[i].tag_id
+						}
+						return {
+							results: data.tags
+						};
+						} else {
+						return { results: [{id: 0}]}
+					}
+				},
+				cache: true
+			},
+			escapeMarkup: function (markup) { return markup; }, // let our custom formatter work
+			minimumInputLength: 1,
+			templateResult: formatTag, // omitted for brevity, see the source of this page
+			templateSelection: formatTagSelection // omitted for brevity, see the source of this page
+
+		});
+		$(".tag_search").on("select2:select", function (e) {
+			window.metrics[e.params.data.tag_id] = true;
+		});
+		$(".tag_search").on("select2:unselect", function (e) {
+			name = e.params.data.tag_id
+			if (e.params.data.id.substring(0, 4) == "tags") {
+				name = e.params.data.id.substring(4, name.length)
+			}
+			console.log(name)
+			delete window.metrics[name];
+		});
+	});
+
+	function formatTag (tag) {
+		if (tag.loading) return tag.text;
+		var markup = tag.tag_name;
+		return markup;
+	}
+
+	function formatTagSelection (tag) {
+	if (tag.id.substring(0, 4) == "tags") {
+		var name
+		$.ajax({
+			async: false,
+			dataType: "json",
+			url: "/tag?tag_id="+tag.id.substring(4, tag.id.length),
+		        success:function(data) {
+			name = data.tags[0].tag_name
+		}});
+		return name
+	}
+
+		return tag.tag_name;
+	}
+
+</script>
+
+<script>
+
+	var select_one = true;
+	$(document).ready(function() {
+
+		hasTags = false;
+		mytags = getParameterByName("tags")
+		if (mytags != "") {
+			mytags = mytags.split(",")
+			for (i = 0; i < mytags.length; i++) {
+				window.tags[mytags[i]] = true
+				value = "tags" + mytags[i]
+				console.log(value)
+				window.optionSearch.append('<option value="' + value + '"></option>').val(value).trigger("change");
+			}
+			console.log(window.tags)
+			update(window.tags, "#info1", "A")
+			hasTags = true
+		}
+
+		hasMetrics = false;
+		mymetrics = getParameterByName("metrics")
+		if (mymetrics != "") {
+			mymetrics = mymetrics.split(",")
+			for (i = 0; i < mymetrics.length; i++) {
+				window.metrics[mymetrics[i]] = true
+				value = "tags" + mymetrics[i]
+				window.tagSearch.append('<option value="' + value + '"></option>').val(value).trigger("change");
+	}
+			console.log(window.metrics)
+			hasMetrics = true
+		}
+
+		if (hasTags && hasMetrics) {
+			search()
+		}
+
+	});
+</script>
+	<table border="0" cellpadding="6px">
+		<tr>
+			<td>
+				人群属性
+				</td>
+				<td>
+				 <select class="option_search" style="width: 400px; height: 100px;" multiple="multiple"></select>
+			</td>
+			<td>
+				<div id="info1"></div>
+			</td>
+
+		</tr>
+		<tr>
+			<td>
+				分析维度
+				</td>
+				<td> <select class="tag_search" style="width: 400px; height: 80px;"  multiple="multiple"></select>
+			</td>
+			<td>
+				<button type="button" onclick="search()" style="border-radius:4px;">开始人群画像分析</button>
+			</td>
+		<td>
+			<div id="permlink"></div>
+		</td>
+
+		</tr>
+	</table>
+<p>下图右半边为选定人群中拥有某个属性的人的百分比。左侧给出了该人群和全网对比情况（TGI），横条在左侧表明TGI小于100，在右侧表明TGI大于100。</p>
+	<div>
+		<table>
+			<tr><td id="base_user_group"></td><td id="compare_user_group"></td></tr>
+			<tr><td style="vertical-align: top;">
+					<div style="float: left" id="chart"></div>
+				</td>
+				</tr></table>
+	</div>

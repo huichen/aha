@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- The above 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->
+  <meta name="description" content="">
+  <meta name="author" content="">
+  <link rel="stylesheet" href="bootstrap/css/bootstrap.min.css">
+  <link rel="stylesheet" href="bootstrap/css/bootstrap-theme.min.css" >
+  <script src="jquery.min.js" ></script>
+  <script src="bootstrap/js/bootstrap.min.js" ></script>
+  <script src="jquery.ba-hashchange.min.js" ></script>
+  <style>
+    body {
+      padding-top: 80px;
+    }
+    .starter-template {
+      text-align: center;
+    }
+  </style>
+  <script language="javascript" type="text/javascript">
+    function resizeIframe(obj) {
+        obj.style.height = obj.contentWindow.document.body.scrollHeight + 'px';
+  }
+  </script>
+
+  <title>Ad Hoc Analytics</title>
+  </head>
+
+<body>
+
+  <nav class="navbar navbar-inverse navbar-fixed-top">
+    <div class="container">
+      <div class="navbar-header">
+        <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar">
+          <span class="sr-only">Toggle navigation</span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+        </button>
+        <a class="navbar-brand" href="">Ad Hoc Analytics</a>
+      </div>
+      <div id="navbar" class="collapse navbar-collapse">
+        <ul class="nav navbar-nav">
+          <li class="active" id="oneGroup"><a href="/#oneGroup">人群画像分析</a></li>
+          <li id="twoGroups"><a href="/#twoGroups" >人群对比分析</a></li>
+
+        </ul>
+      </div><!--/.nav-collapse -->
+    </div>
+  </nav>
+
+  <div class="container">
+    <div class="starter-template">
+      <iframe id="frame" width=100% frameborder=0 height="10000" ></iframe>
+    </div>
+
+  </div><!-- /.container -->
+<script>
+
+
+
+$(function(){
+  oldHash = "#oneGroup"
+  // Bind an event to window.onhashchange that, when the hash changes, gets the
+  // hash and adds the class "selected" to any matching nav link.
+  $(window).hashchange( function(){
+    var hash = location.hash;
+    if (hash == "") {
+      hash = "oneGroup"
+    }
+
+    hash = hash.replace( /^#/, '' )
+
+    page = hash + ".html";
+    $('#frame').attr("src", page + location.search)
+    id = "#" + hash
+    $(oldHash).attr("class", "")
+    $(id).attr("class", "active")
+    oldHash = id
+  })
+  
+  // Since the event is only triggered when the hash changes, we need to trigger
+  // the event now, to handle the hash the page may have loaded with.
+  $(window).hashchange();
+
+});
+
+</script>
+
+</body>
+</html>
